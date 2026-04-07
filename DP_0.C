@@ -26,24 +26,8 @@ vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, do
 vector<double> differential_cs_gamma_A(vector<double> dSigma_dEA_v, double epsilon);//equation (2)
 //equation (1). Retorna una integral
 double differential_number_DP(vector<double> dSgamma_A_v,vector<double> dNg_dEg_v, vector<double> total_cross_section_v, vector<double> E_gamma_cut_v);//equation (1). Retorna una integral
-vector<double> tensor_to_vector(vector<vector<vector<double>>> LA_tensor, int ii, int jj);
 //........................................................................................
-//Configuracion global para los gráficos
-void SetGlobalStyle(){
-	TStyle *st1 = new TStyle("st1","my style");
-	//st1->SetTitleSize(0.05,"XYZ");
-	//st1->SetLabelSize(0.05, "XYZ");
-	st1->SetMarkerSize(1.0);
-//	st1->SetPadBorderMode(0);
-//	st1->SetLegendTextSize(0.035);
-//	st1->SetLegendBorderSize(-1);
-//	st1->SetGridColor(0);
-	st1->SetLegendFillColor(0);
-//	gStyle->SetLegendFillColor(0);
-	gROOT->SetStyle("st1");//
-	gROOT->ForceStyle();//esto no funciona: el estilo se aplica a todos los objetos creados después
-	st1->cd ();//This is now the current style gStyle
-}
+
 //........................................................................................
 //Contenedores···
 const string filetitle{"/home/eliana/Documentos/Scripts/limites_de_exclusion/Uranium-Coef_atenuacion_nist_gov_XrayMassCoef.txt"};
@@ -53,8 +37,8 @@ vector<double> E_gamma_cut_v, muroh_cut_v, murohen_cut_v;//incident gamma energy
 vector<double> EA_v;
 vector<double> dNA_dEA_v;//auxiliar. Para llenar la matriz.
 vector<double> dNA_dEA_KN_v;//auxiliar. Para llenar la matriz.
-vector<vector<vector<double>>> dNA_dEA_tensor;
-vector<vector<vector<double>>> dNA_dEA_KN_tensor;
+vector<vector<double>> dNA_dEA_matrix;
+vector<vector<double>> dNA_dEA_KN_matrix;
 //Constantes···
 float rho_U{1.895e1};//[g/cm3]
 float NA{6.02214076e23};
@@ -66,8 +50,6 @@ float pi_ro2mec2{0};
 
 void DP()
 {
-	//SetGlobalStyle();
-
 	//Coeficientes de atenuación másicos en función de la energía del gamma incidente ····
 	archivo_a_vectores(E_cross_section_v,muroh_v,murohen_v,filetitle);
 	//Cuentitas ····
@@ -103,64 +85,70 @@ void DP()
 	//Lleno EA_v vector de energías de los DP producidos ····
 	int n{100};//cantidad de puntos en el vector
 	float EA1{0.1};float EA2{4.0};//límites de integración en (7) y en la figura 1
-	for(int i{0}; i < n; ++i) EA_v.push_back(i*(EA2-EA1)/n+EA1);
+	for(int i{0}; i < n +1; ++i) EA_v.push_back(i*(EA2-EA1)/n+EA1);
 	//for (auto k:EA_v) cout << k << endl;//mostrar en pantalla
-	cout << "#elementos en EA_v = " << EA_v.size() << endl;
 	//Parámetros ····
-	vector<double> epsilon_v{0.01,1.0};
+	vector<double> epsilon_v{0.001, 0.01, 1.0};
 	vector<double> mA_v{0.1, 0.5, 1.0};
+
+	//····························································
+	//Sección eficaz de producción de DP vía Compton 		  ····
+	//····························································
+	//Función de la energía del gamma incidente, EA, mA ···· 
+	vector<double> dSC_dEA_T_v=differential_cross_section_Thomson(E_gamma_cut_v, 2.0, mA_v.at(2));//(vector<double> E_g_v, double EA, double mAc2);
+	vector<double> dSC_dEA_KN_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v,2.0, mA_v.at(2));
+	//Función de la sección eficaz Compton, epsilon ····
+	vector<double> dSgamma_A_v=differential_cs_gamma_A(dSC_dEA_T_v, epsilon_v.at(2));///(E_gamma_cut_v,2, 0.1);//differential cross section for sigma gamma -> A'
 
 	//····························································
 	//Producción de DP vía Compton 							  ····
 	//····························································
-	//Figura 1. LLeno la matriz dNA_dEA_tensor.  dNA'/dEA' variando mA' y epsilon. 
+	//(1) ····
+	//Calculo un punto en la figura 1. dNA'/dEA'
+	//double dNA_dEA = differential_number_DP(dSgamma_A_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v);
 	
-	//Defino la dimensión del tensor vacío antes de llenarlo para poder iterar dNA_dEA_tensor[i][k][j]
-	//Queda dNA_dEA_tensor[mA][EA][epsilon]
-	vector<vector<vector<double>>> dNA_dEA_tensor(mA_v.size(),vector<vector<double>>(EA_v.size(),vector<double>(epsilon_v.size())));
-	vector<vector<vector<double>>> dNA_dEA_KN_tensor(mA_v.size(),vector<vector<double>>(EA_v.size(),vector<double>(epsilon_v.size())));
+	//Calculo muchos puntos en la figura 1. dNA'/dEA' para mA' fijo y epsilon = 1. LLeno la matriz dNA_dEA_matrix.
+	
+	for(int j{0}; j < mA_v.size(); ++j){
+		cout << "mA_v.at(" << j << ") = "<< mA_v.at(j) << endl;
 
-	//Lleno tensor 
-	for(int i{0}; i < mA_v.size(); ++i){
-		//cout << "mA_v.at(" << i << ") = " << mA_v.at(i) << endl;
 		//Lleno dNA_dEA_v para mA_v.at(j)
+		for(int i {0}; i < EA_v.size(); ++i){
+			//(2) en EA(i), mA(j) 
+			vector<double> dSC_dEA_T_v=differential_cross_section_Thomson(E_gamma_cut_v, EA_v.at(i), mA_v.at(j));
+			vector<double> dSC_dEA_KN_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v, EA_v.at(i), mA_v.at(j));
+			vector<double> dSgamma_A_v=differential_cs_gamma_A(dSC_dEA_T_v, epsilon_v.at(2));
+			vector<double> dSgamma_A_KN_v=differential_cs_gamma_A(dSC_dEA_KN_v, epsilon_v.at(2));
+			//(1)
+			dNA_dEA_v.push_back(differential_number_DP(dSgamma_A_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v));
+			dNA_dEA_KN_v.push_back(differential_number_DP(dSgamma_A_KN_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v));
+		
+			//cout << "EA_v.at(" << i << ") = " << EA_v.at(i) << endl;
+			//Borro contenido de (2) para llenarlo con la siguiente iteración
+			dSgamma_A_v.clear();
+			dSC_dEA_T_v.clear();
+			dSgamma_A_KN_v.clear();
+			dSC_dEA_KN_v.clear();
+			//cout << "Contenido de dSgamma_A_v: " << endl;
+			//for (auto k:dSgamma_A_v) cout << "dSgamma_A_v " << k << endl;//mostrar que borré
+		
+		}
+		//Guardo contenido de (1) en filas
+		dNA_dEA_matrix.push_back(dNA_dEA_v);
+		dNA_dEA_KN_matrix.push_back(dNA_dEA_KN_v);
+		//Borro contenido de (1) para llenarlo con la siguiente iteración
+		dNA_dEA_v.clear();
+		dNA_dEA_KN_v.clear();
+	}
+/*
+	cout << "--------- mostrando dNA_dEA_matrix --------- " << endl;
 
-		for(int j{0}; j < epsilon_v.size(); ++j){
-			//cout << "epsilon_v.at(" << j << ") = " << epsilon_v.at(j) << endl;
-
-			//Guardo LA en la fila i, capa j
-			for(int k{0}; k < EA_v.size();++k){
-				//cout << "EA_v[" << k << "] = " << EA_v[k] << endl;
-				//(2) en mA(j), EA(i), epsilon_v(j)
-				vector<double> dSC_dEA_T_v=differential_cross_section_Thomson(E_gamma_cut_v, EA_v.at(k), mA_v.at(i));
-				vector<double> dSC_dEA_KN_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v, EA_v.at(k), mA_v.at(i));
-				vector<double> dSgamma_A_v=differential_cs_gamma_A(dSC_dEA_T_v, epsilon_v.at(j));
-				vector<double> dSgamma_A_KN_v=differential_cs_gamma_A(dSC_dEA_KN_v, epsilon_v.at(j));
-				//(1)
-				//cout << " HOOOOOOOOOOOOLAAAAAAAAA" << endl;
-				dNA_dEA_tensor[i][k][j] = differential_number_DP(dSgamma_A_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v);
-				dNA_dEA_KN_tensor[i][k][j] = differential_number_DP(dSgamma_A_KN_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v);
-				//cout <<" dNA_dEA_tensor[i][k][j] = "<< differential_number_DP(dSgamma_A_v, dNg_dEg_v, total_cross_section_v, E_gamma_cut_v) << endl;
-
-				//Borro contenido de (2) para llenarlo con la siguiente iteración. ¿Esto se puede suprimir?
-				dSgamma_A_v.clear();
-				dSC_dEA_T_v.clear();
-				dSgamma_A_KN_v.clear();
-				dSC_dEA_KN_v.clear();
-
-			}
-
-			//cout << "--------" << endl;
+	for(int j{0}; j < mA_v.size(); ++j){
+		cout << "------ Fila " << j << " ----- " << endl;
+		for(int i {0}; i < EA_v.size(); ++i){
+			cout << dNA_dEA_matrix[j][i] << endl;
 		}
 	}
-
-/*
-	cout << "--------- mostrando dNA_dEA_tensor --------- " << endl;
-
-	for(int k{0}; k < EA_v.size(); ++k) cout << LA_tensor[1][k][0] << endl;
-	cout << "LA_tensor size: " << std::size(LA_tensor) << endl; 
-	cout << "---------------------------------------------------" << endl;
-
 */
 	//dSgamma_A_v.clear();
 	//cout << dSgamma_A_v.capacity() << endl;
@@ -171,14 +159,6 @@ void DP()
 	//cout << "Longitud(sección eficaz total) = " << total_cross_section_v.size() << endl;
 	//cout << "Longitud(sección eficaz diferencial gamma -> A') = " << dSgamma_A_v.size() << endl;
 
-	//····························································
-	//Sección eficaz de producción de DP vía Compton 		  ····
-	//····························································
-	//Función de la energía del gamma incidente, EA, mA ···· 
-//	vector<double> dSC_dEA_T_v=differential_cross_section_Thomson(E_gamma_cut_v, 2.0, mA_v.at(2));//(vector<double> E_g_v, double EA, double mAc2);
-//	vector<double> dSC_dEA_KN_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v,2.0, mA_v.at(2));
-	//Función de la sección eficaz Compton, epsilon ····
-//	vector<double> dSgamma_A_v=differential_cs_gamma_A(dSC_dEA_T_v, epsilon_v.at(2));///(E_gamma_cut_v,2, 0.1);//differential cross section for sigma gamma -> A'
 	
 	//··········································
 	//Probando sección eficaz Compton usual ····
@@ -189,71 +169,62 @@ void DP()
 	//···································
 	
 	//Gráficos ····
-	gStyle->SetMarkerSize(1.2);//configuración global
 	//------------------------------------------------------------
 	//Producción. Número de DPs por segundo
 	//------------------------------------------------------------
-	//Vectores auxiliares para graficar mi "tensor"
-	vector<double> La_v1=tensor_to_vector(dNA_dEA_KN_tensor, 0, 1);
-	vector<double> La_v2=tensor_to_vector(dNA_dEA_KN_tensor, 1, 1);
-	vector<double> La_v3=tensor_to_vector(dNA_dEA_KN_tensor, 2, 1);
-	vector<double> La_v11=tensor_to_vector(dNA_dEA_KN_tensor, 0, 0);
-	vector<double> La_v22=tensor_to_vector(dNA_dEA_KN_tensor, 1, 0);
-	vector<double> La_v33=tensor_to_vector(dNA_dEA_KN_tensor, 2, 0);
-	
 	TCanvas*c4 = new TCanvas("Fig 1 ","Fig 1", 900, 500);
-	TGraph*LA_v = new TGraph(EA_v.size(), &EA_v[0], &La_v1[0]);
-	TGraph*LA11_v = new TGraph(EA_v.size(), &EA_v[0], &La_v11[0]);
-	TGraph*LA2_v = new TGraph(EA_v.size(), &EA_v[0], &La_v2[0]);
-	TGraph*LA22_v = new TGraph(EA_v.size(), &EA_v[0], &La_v22[0]);
-	TGraph*LA3_v = new TGraph(EA_v.size(), &EA_v[0], &La_v3[0]);
-	TGraph*LA33_v = new TGraph(EA_v.size(), &EA_v[0], &La_v33[0]);
+	TGraph*TDP_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_matrix[0][0]);
+	TGraph*KNDP_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_KN_matrix[0][0]);
+
+	TGraph*TDP2_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_matrix[1][0]);
+	TGraph*KNDP2_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_KN_matrix[1][0]);
+	
+	TGraph*TDP3_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_matrix[2][0]);
+	TGraph*KNDP3_gr = new TGraph(EA_v.size(), &EA_v[0], &dNA_dEA_KN_matrix[2][0]);
 	
 	c4->SetGrid();
 	gPad->SetLogy();
 	gPad->SetLogx();
-	LA_v->Draw("AP");
-	LA2_v->Draw("sameP");//
-	LA3_v->Draw("sameP");//
-	LA11_v->Draw("sameP");//
-	LA22_v->Draw("sameP");//
-	LA33_v->Draw("sameP");//
-	
-	LA_v->SetMarkerStyle(20);
-	LA2_v->SetMarkerStyle(22);
-	LA3_v->SetMarkerStyle(21);
-	LA11_v->SetMarkerStyle(20);
-	LA22_v->SetMarkerStyle(22);
-	LA33_v->SetMarkerStyle(21);
+	TDP_gr->Draw("APL");
+	TDP2_gr->Draw("samePL");//
+	TDP3_gr->Draw("samePL");//
+	TDP_gr->SetMarkerStyle(20);
+	TDP_gr->SetMarkerColor(kCyan);
+	TDP_gr->SetLineColor(kCyan);
+	TDP2_gr->SetMarkerStyle(22);
+	TDP3_gr->SetMarkerStyle(21);
+	TDP2_gr->SetMarkerColor(kCyan+1);
+	TDP2_gr->SetLineColor(kCyan+1);
+	TDP3_gr->SetMarkerColor(kBlue-4);
+	TDP3_gr->SetLineColor(kBlue-4);
+	KNDP_gr->Draw("sameP");//
+	KNDP_gr->SetMarkerStyle(20);
+	KNDP2_gr->Draw("sameP");//
+	KNDP3_gr->Draw("sameP");//
+	KNDP2_gr->SetMarkerStyle(22);
+	KNDP3_gr->SetMarkerStyle(21);
+	KNDP_gr->SetMarkerColor(kOrange);KNDP_gr->SetLineColor(kOrange);
 
-	LA_v->SetMarkerColor(kCyan);
-	LA2_v->SetMarkerColor(kCyan+1);
-	LA3_v->SetMarkerColor(kBlue-4);
-	
-	LA11_v->SetMarkerColor(kOrange);
-	LA22_v->SetMarkerColor(kOrange+1);
-	LA33_v->SetMarkerColor(kOrange-4);
-	
-	//LA_v->SetTitle("Number of U(1) dark photons produced via Compton-like process - Thomson Cross Section");
-	LA_v->SetTitle("Number of U(1) dark photons produced via Compton-like process - Klein Nishina Cross Section");
-	LA_v->GetYaxis()->SetTitle("#frac{dN_{A'}}{dE_{A'}}[MeV^{-1}s^{-1}]");
-	//LA_v->GetYaxis()->SetRangeUser(1e-16, 1e1);//Thomson
-	LA_v->GetYaxis()->SetRangeUser(1e-16, 1e-2);//Klein Nishina
-	LA_v->GetXaxis()->SetTitle("E [MeV]");
+	KNDP2_gr->SetMarkerColor(kOrange+7);KNDP2_gr->SetLineColor(kOrange+7);
+	KNDP3_gr->SetMarkerColor(kOrange+10);KNDP3_gr->SetLineColor(kOrange+10);
 
-	auto leg4 = new TLegend(0.70,0.67,0.90,0.97); 
-    leg4->AddEntry(LA_v,("m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV " + "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
-    leg4->AddEntry(LA2_v,("m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
-    leg4->AddEntry(LA3_v,("m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
-    leg4->AddEntry(LA11_v,("m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV " + "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
-    leg4->AddEntry(LA22_v,("m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
-    leg4->AddEntry(LA33_v,("m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
+	TDP_gr->SetTitle("Number of U(1) dark photons produced via Compton-like process");
+	TDP_gr->GetYaxis()->SetTitle("#frac{dN_{A'}}{dE_{A'}}[MeV^{-1}s^{-1}]");
+	TDP_gr->GetYaxis()->SetRangeUser(1e-12, 1e2);
+	TDP_gr->GetXaxis()->SetTitle("E_{A'}[MeV]");
 
-    leg4->SetTextSize(0.03); 
+	auto leg4 = new TLegend(0.60,0.57,0.87,0.87); 
+    leg4->AddEntry(TDP_gr,("T m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->AddEntry(KNDP_gr,("KN m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->AddEntry(TDP2_gr,("T m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->AddEntry(KNDP2_gr,("KN m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->AddEntry(TDP3_gr,("T m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->AddEntry(KNDP3_gr,("KN m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV").c_str(),"p");
+    leg4->SetTextSize(0.04); 
     leg4->SetBorderSize(0);
     leg4->Draw();
 
-    c4->Print("Number_of_dark_photons_produced_via_Compton-like_process_KN_Cross_Section.png");
+    c4->Print("Number_of_dark_photons_produced_via_Compton-like_process.png");
 	//------------------------------------------------------------
 	//Secciones eficaces de producción
 	//------------------------------------------------------------
@@ -359,7 +330,6 @@ void DP()
 // Fin void DP ····
 }
 
-//Function definition ························································································
 void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>& z_v, const string filetitle)
 {
 	
@@ -386,15 +356,6 @@ void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>
 	}
 
 	file.close();
-}
-
-//Guardar las filas del tensor [i][k][j] en un vector para graficar
-vector<double> tensor_to_vector(vector<vector<vector<double>>> LA_tensor, int ii, int jj){
-	vector<double> y_val;
-	for(int k = 0; k < EA_v.size(); ++k) {
-	    y_val.push_back(LA_tensor[ii][k][jj]);
-	}
-	return y_val;
 }
 
 //Gamma flux for the FRJ-1 reactor, valid for E_gamma > 200 keV. Use [Energy]=MeV [P] = MW
@@ -433,7 +394,6 @@ vector<double> differential_cross_section_Thomson(vector<double> E_g_v, double E
 
 	return dSigma_dEA_v;
 }
-
 //Klein Nishina····
 vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double EA, double mAc2){
 	vector<double> dSigma_dEA_v;
@@ -465,6 +425,8 @@ double differential_number_DP(vector<double> dSgamma_A_v,vector<double> dNg_dEg_
 	return dNA_dEA;
 }
 
+
+
 //Compton clásico
 //Sección eficaz diferencial en función de la energía del gamma incidente para un valor fijo de energía del gamma dispersado
 //Use [Energy]=MeV
@@ -488,3 +450,5 @@ vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, do
 	}
 	return dSigma_dEgprima_v;
 }
+
+//cout << "Hola" << endl;

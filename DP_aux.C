@@ -1,5 +1,5 @@
 /*Código desarrollado para graficar secciones eficaces y funciones usadas en el cálculo de límites de exclusión.
-Última actualización: 04/04/2026
+Última actualización: 06/04/2026
 Autora: E.Depaoli
 Basado en "Detecting Dark Photons with Reactor Neutrino Experiments" H.K.Park DOI: 10.1103/PhysRevLett.119.081801
 */
@@ -13,7 +13,6 @@ Basado en "Detecting Dark Photons with Reactor Neutrino Experiments" H.K.Park DO
 
 using std::cout;
 using std::endl;
-
 //........................................................................................
 //Funciones. Explicación al final, donde están definidas.
 void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>& z_v, const string filetitle);
@@ -23,7 +22,27 @@ vector<double> differential_cross_section_Thomson(vector<double> E_g_v, double E
 vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double Egprima);
 vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double EA, double mAc2);//DP
 vector<double> differential_cs_gamma_A(vector<double> dSigma_dEA_v, double epsilon);//equation (2)
+vector<double> decay_length_LA(vector<double> EA_v, double mA_v, double epsilon);//(5)[mA]=[EA]=MeV
+vector<double> tensor_to_vector(vector<vector<vector<double>>> LA_tensor, int ii, int jj);
 //........................................................................................
+
+//Configuracion global para los gráficos --------------------------
+void SetGlobalStyle(){
+	TStyle *st1 = new TStyle("st1","my style");
+	//st1->SetTitleSize(0.05,"XYZ");
+	//st1->SetLabelSize(0.05, "XYZ");
+	st1->SetMarkerSize(1.5);
+//	st1->SetPadBorderMode(0);
+//	st1->SetLegendTextSize(0.035);
+//	st1->SetLegendBorderSize(-1);
+//	st1->SetGridColor(0);
+	st1->SetLegendFillColor(0);
+//	gStyle->SetLegendFillColor(0);
+	gROOT->SetStyle("st1");//
+	gROOT->ForceStyle();//esto no funciona: el estilo se aplica a todos los objetos creados después
+	st1->cd ();//This is now the current style gStyle
+}
+
 
 //........................................................................................
 //Contenedores···
@@ -32,6 +51,9 @@ vector<double> E_cross_section_v,  muroh_v, murohen_v;
 vector<double> total_cross_section_v;
 vector<double> E_gamma_cut_v, muroh_cut_v, murohen_cut_v;//incident gamma energy, mass atenuation coefficents. From table.
 vector<double> dSgA_dE_v;
+vector<double> EA_v;
+vector<double> LA_v;//auxiliar. Para llenar la matriz.
+vector<vector<vector<double>>> LA_tensor;
 //Constantes···
 float rho_U{1.895e1};//[g/cm3]
 float NA{6.02214076e23};
@@ -43,6 +65,7 @@ float pi_ro2mec2{0};
 
 void DP_aux()
 {
+	SetGlobalStyle();
 	//Coeficientes de atenuación másicos en función de la energía del gamma incidente ····
 	archivo_a_vectores(E_cross_section_v,muroh_v,murohen_v,filetitle);
 	
@@ -63,6 +86,48 @@ void DP_aux()
 
 	//Sección eficaz total en función de la energía del gamma incidente ···· 
 	for (int i{0}; i < muroh_cut_v.size();i++) total_cross_section_v.push_back(Mr_U*muroh_cut_v.at(i)/NA/1e-24); 
+
+	//Lleno EA_v vector de energías de los DP producidos ····
+	int n{5};//cantidad de puntos en el vector
+	float EA1{0.1};float EA2{4.0};//límites de integración en (7) y en la figura 1
+	for(int i{0}; i < n; ++i) EA_v.push_back(i*(EA2-EA1)/n+EA1);
+	//for (auto k:EA_v) cout << k << endl;//mostrar en pantalla
+	cout << "#elementos en EA_v = " << EA_v.size() << endl;
+	//Parámetros ····
+	vector<double> epsilon_v{0.01,1.0};
+	vector<double> mA_v{0.1, 0.5, 1.0};
+
+	//····························································
+	//Longitud de decaimiento de A' a 3 fotones visibles [m]  ····
+	//····························································
+	//En función de la energía y de la masa del A' incidente ···· 
+	//Defino la dimensión del tensor vacío antes de llenarlo para poder iterar LA_tensor[i][k][j] = LA_v[k];
+	//Queda LA[mA][EA][epsilon]
+	vector<vector<vector<double>>> LA_tensor(mA_v.size(),vector<vector<double>>(EA_v.size(),vector<double>(epsilon_v.size())));
+
+	//Lleno tensor 
+	for(int i{0}; i < mA_v.size(); ++i){
+		cout << "mA_v.at(i)" << mA_v.at(i) << " ---------- " << endl;
+		for(int j{0}; j < epsilon_v.size(); ++j){
+			cout << "epsilon_v.at(j)" << epsilon_v.at(j) << " ---------- " << endl;
+			//Calculo LA para mA(i), epsilon(j)
+			LA_v=decay_length_LA(EA_v, mA_v.at(i),epsilon_v.at(j));
+	//		cout << "LA_v.size() = " << LA_v.size() << endl;
+			//Guardo LA en la fila i, capa j
+			for(int k{0}; k < LA_v.size();++k){
+				LA_tensor[i][k][j] = LA_v[k];//
+				cout << LA_v[k] << endl;
+			}
+
+			cout << "------" << endl;
+			//LA_v.clear();//No es necesario porque lo piso cada vez
+		}
+	}
+
+	cout << "---------------------------------------------------" << endl;
+	for(int k{0}; k < EA_v.size(); ++k) cout << LA_tensor[1][k][0] << endl;
+	cout << "LA_tensor size: " << std::size(LA_tensor) << endl; 
+	cout << "---------------------------------------------------" << endl;
 
 	//····························································
 	//Probando Sección eficaz de producción de DP vía Compton ····
@@ -95,7 +160,6 @@ void DP_aux()
 	//Flujo gamma total generado en el reactor ···· 
 	float integral_above_1MeV{0};
 	
-	
 	for(int i{0}; i < E_gamma_cut_v.size()-1;i++)
 	{
 		integral_above_1MeV += dNg_dEg_v.at(i)*(E_gamma_cut_v.at(i+1)-E_gamma_cut_v.at(i));
@@ -106,30 +170,92 @@ void DP_aux()
 	//Producción de DP vía Compton 							  ····
 	//····························································
 	vector<double> dSgamma_A_v=differential_cs_gamma_A(dSigma_dEA_T_v, 1);///(E_gamma_cut_v,2, 0.1);//differential cross section for sigma gamma -> A'
-	
+
+	/*
 	cout << "Longitud(energías) = " << E_gamma_cut_v.size() << endl;
 	cout << "Longitud(flujo gamma) = " << dNg_dEg_v.size() << endl;
 	cout << "Longitud(sección eficaz total) = " << total_cross_section_v.size() << endl;
 	cout << "Longitud(sección eficaz diferencial gamma -> A') = " << dSgamma_A_v.size() << endl;
+*/
 
 	//Calculo un punto en la figura 1. dNA'/dEA'
-	double dNA_dEA{0};
+/*	double dNA_dEA{0};
 
 	for(int i{0}; i < dSgamma_A_v.size()-1; ++i){
 		dNA_dEA+= pow(total_cross_section_v.at(i),-1)*dSgamma_A_v.at(i)*dNg_dEg_v.at(i)*(E_gamma_cut_v.at(i+1)-E_gamma_cut_v.at(i));
 	}
-
-	cout << dNA_dEA << endl;
-	dSgamma_A_v.clear();
-	//cout << dSgamma_A_v.capacity() << endl;
+*/
 	//for (auto k:dSgamma_A_v) cout << k << endl;//mostrar en pantalla
-	//Calculo muchos puntos en la figura 1. dNA'/dEA' para mA' fijo
 	
 	//Gráficos ····
+	//····························································
+	//Longitud de decaimiento de A' a 3 fotones visibles [m]  ····
+	//····························································
+	//Vectores auxiliares para graficar mi "tensor"
+	vector<double> La_v1=tensor_to_vector(LA_tensor, 0, 1);
+	vector<double> La_v2=tensor_to_vector(LA_tensor, 1, 1);
+	vector<double> La_v3=tensor_to_vector(LA_tensor, 2, 1);
+	vector<double> La_v11=tensor_to_vector(LA_tensor, 0, 0);
+	vector<double> La_v22=tensor_to_vector(LA_tensor, 1, 0);
+	vector<double> La_v33=tensor_to_vector(LA_tensor, 2, 0);
+	
+	TCanvas*c5 = new TCanvas("DP decay length","DP decay length", 900, 500);
+	TGraph*LA_v = new TGraph(EA_v.size(), &EA_v[0], &La_v1[0]);
+	TGraph*LA11_v = new TGraph(EA_v.size(), &EA_v[0], &La_v11[0]);
+	TGraph*LA2_v = new TGraph(EA_v.size(), &EA_v[0], &La_v2[0]);
+	TGraph*LA22_v = new TGraph(EA_v.size(), &EA_v[0], &La_v22[0]);
+	TGraph*LA3_v = new TGraph(EA_v.size(), &EA_v[0], &La_v3[0]);
+	TGraph*LA33_v = new TGraph(EA_v.size(), &EA_v[0], &La_v33[0]);
+	
+	c5->SetGrid();
+	gPad->SetLogy();
+	gPad->SetLogx();
+	LA_v->Draw("AP");
+	LA2_v->Draw("sameP");//
+	LA3_v->Draw("sameP");//
+	LA11_v->Draw("sameP");//
+	LA22_v->Draw("sameP");//
+	LA33_v->Draw("sameP");//
+	
+	LA_v->SetMarkerStyle(20);
+	LA2_v->SetMarkerStyle(22);
+	LA3_v->SetMarkerStyle(21);
+	LA11_v->SetMarkerStyle(20);
+	LA22_v->SetMarkerStyle(22);
+	LA33_v->SetMarkerStyle(21);
+
+	LA_v->SetMarkerColor(kCyan);
+	LA2_v->SetMarkerColor(kCyan+1);
+	LA3_v->SetMarkerColor(kBlue-4);
+	
+	LA11_v->SetMarkerColor(kOrange);
+	LA22_v->SetMarkerColor(kOrange+1);
+	LA33_v->SetMarkerColor(kOrange-4);
+	
+	LA_v->SetTitle("Dark Photon decay length");
+	LA_v->GetYaxis()->SetTitle("L_{A'}[m]");
+	LA_v->GetYaxis()->SetRangeUser(1e1, 1e18);
+	LA_v->GetXaxis()->SetTitle("E [MeV]");
+
+	auto leg5 = new TLegend(0.70,0.67,0.90,0.97); 
+    leg5->AddEntry(LA_v,("m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV " + "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
+    leg5->AddEntry(LA2_v,("m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
+    leg5->AddEntry(LA3_v,("m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(1)).substr(0,4)).c_str(),"p");
+    leg5->AddEntry(LA11_v,("m'_{A'} = "+std::to_string(mA_v.at(0)).substr(0,3)+" MeV " + "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
+    leg5->AddEntry(LA22_v,("m'_{A'} = "+std::to_string(mA_v.at(1)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
+    leg5->AddEntry(LA33_v,("m'_{A'} = "+std::to_string(mA_v.at(2)).substr(0,3)+" MeV "+ "#varepsilon = " + std::to_string(epsilon_v.at(0)).substr(0,4)).c_str(),"p");
+
+    leg5->SetTextSize(0.03); 
+    leg5->SetBorderSize(0);
+    leg5->Draw();
+
+    //c5->Print("DP_decay_length.png");
+	//------------------------------------------------------------
+
 	//------------------------------------------------------------
 	//Secciones eficaces de producción
 	//------------------------------------------------------------
-	TCanvas*c4 = new TCanvas("DP production differential cross section","DP production differential cross section", 900, 500);
+/*	TCanvas*c4 = new TCanvas("DP production differential cross section","DP production differential cross section", 900, 500);
 	TGraph*TDP_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_T_v[0]);
 	TGraph*KNDP_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_KN_v[0]);
 
@@ -142,8 +268,8 @@ void DP_aux()
 	c4->SetGrid();
 	gPad->SetLogy();
 	gPad->SetLogx();
-	TDP_gr->Draw("AP");
-	KNDP_gr->Draw("sameP");//
+	//TDP_gr->Draw("AP");
+	//KNDP_gr->Draw("sameP");//
 	TDP_gr->SetMarkerStyle(20);
 	KNDP_gr->SetMarkerStyle(20);
 
@@ -152,7 +278,6 @@ void DP_aux()
 	TDP3_gr->Draw("sameP");//
 	KNDP3_gr->Draw("sameP");//
 
-	
 	TDP2_gr->SetMarkerStyle(22);
 	KNDP2_gr->SetMarkerStyle(22);
 	TDP3_gr->SetMarkerStyle(21);
@@ -262,8 +387,6 @@ void DP_aux()
 	//------------------------------------------------------------
 	//Sección eficaz total de interacción de gammas contra Uranio
 	//------------------------------------------------------------
-
-
 	TCanvas*c1 = new TCanvas("Mass Attenuation Coeficients","Mass Attenuation Coeficients", 900, 500);
 	TGraph*mac = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &muroh_cut_v[0]);//&E_gamma_cut_v[0]);//
 	TGraph*csU = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &total_cross_section_v[0]);
@@ -284,7 +407,8 @@ void DP_aux()
 	//mac->Draw("AP");
 	csU->Draw("AP");//Draw("same");//
 	//c1->Print("total_cross_section.png");
-// Fin void DP ····
+*/
+	// Fin void DP ····
 }
 
 void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>& z_v, const string filetitle)
@@ -313,6 +437,23 @@ void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>
 	}
 
 	file.close();
+}
+
+//Guardar las filas del tensor [i][k][j] en un vector para graficar
+vector<double> tensor_to_vector(vector<vector<vector<double>>> LA_tensor, int ii, int jj){
+	vector<double> y_val;
+	for(int k = 0; k < EA_v.size(); ++k) {
+	    y_val.push_back(LA_tensor[ii][k][jj]);
+	}
+	return y_val;
+}
+
+//DP decay length. Eq. (5)
+//Use [EA]=MeV, [mA]=MeV
+vector<double> decay_length_LA(vector<double> EA_v, double mA_v, double epsilon){
+	vector<double> LA_v;
+	for(auto k:EA_v) LA_v.push_back(505*pow(epsilon,-2)*k*pow(mA_v,-10));
+	return LA_v;
 }
 
 //Gamma flux for the FRJ-1 reactor, valid for E_gamma > 200 keV. Use [Energy]=MeV [P] = MW
