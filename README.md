@@ -15,4 +15,6 @@ Calculé la relación de dispersión usando la misma estrategia que para el Comp
 
 ![KN_gammas_no_polarizados[1].pdf](KN_gammas_no_polarizados[1].pdf)
 
-Sección eficaz de interacción en función de la energía $E_{\gamma}$ y $E_{\gamma'}$ 
+![Thomson_scattering_cross_section[1].pdf](Thomson_scattering_cross_section[1].pdf)
+
+Secciones eficaces de interacción en función de la energía $E_{\gamma}$ y $E_{\gamma'}$ 
