@@ -17,4 +17,4 @@ Calculé la relación de dispersión usando la misma estrategia que para el Comp
 
 ![Thomson_scattering_cross_section[1].pdf](Thomson_scattering_cross_section[1].pdf)
 
-Secciones eficaces de interacción en función de la energía $E_{\gamma}$ y $E_{\gamma'}$ 
+Secciones eficaces de interacción en función de la energía $E_{\gamma}$ y $E_{\gamma'}$. Hice la cuenta clásica y luego copié la estrategia para el caso del fotón masivo.
