@@ -12,3 +12,7 @@ En ambos están implementadas las secciones eficaces de Thomson y de Klein Nishi
 ![Compton_foton_masivo[1].pdf](Compton_foton_masivo[1].pdf)
 
 Calculé la relación de dispersión usando la misma estrategia que para el Compton clásico.
+
+![KN_gammas_no_polarizados[1].pdf](KN_gammas_no_polarizados[1].pdf)
+
+Sección eficaz de interacción en función de la energía E$_{\gamma}$ y E$_{\gamma'}$ 
