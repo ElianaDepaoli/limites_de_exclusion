@@ -9,4 +9,6 @@ Por el momento llega hasta la ecuación (5).
 
 En ambos están implementadas las secciones eficaces de Thomson y de Klein Nishina. Para la sección eficaz total uso datos experimentales.
 
-[Compton_foton_masivo[1].pdf][Compton_foton_masivo[1].pdf]
+![Compton_foton_masivo[1].pdf](Compton_foton_masivo[1].pdf)
+
+Calculé la relación de dispersión usando la misma estrategia que para el Compton clásico.
