@@ -16,9 +16,11 @@ El archivo **DP_aux.C** contiene los siguientes cálculos auxiliares:
 4.Longitud de decaimiento de fotones masivos oscuros. Ecuación (5) de Park, 2017
 
 5. Secciones eficaces totales de producción de fotones masivos. Ecuaciones (A1, A2, A3) de Gondolo, 2009
-![Compton_cross_section_for_production_of_massive_vector_boson.png][Compton_cross_section_for_production_of_massive_vector_boson.png]
+![Compton_cross_section_for_production_of_massive_vector_boson.png](Compton_cross_section_for_production_of_massive_vector_boson.png)
 
 Lo que sigue está mal:
 ![Compton_foton_masivo[1].pdf](Compton_foton_masivo[1].pdf)
+
+
 Calculé la relación de dispersión usando la misma estrategia que para el Compton clásico.
 Secciones eficaces de interacción en función de la energía $E_{\gamma}$ y $E_{\gamma'}$. Hice la cuenta clásica y luego copié la estrategia para el caso del fotón masivo.
