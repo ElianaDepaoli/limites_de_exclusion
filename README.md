@@ -6,10 +6,13 @@ arXiv:1705.02470v4
 El archivo **DP_aux.C** contiene los siguientes cálculos auxiliares:
 
 1.Sección eficaz total de interacción de gammas con Uranio. Obtenida a partir de tablas de datos nucleares (datos experimentales)
+
 2.Flujo gamma modelado para el reactor FRJ-1, válido para E$_{\gamma \geq 200$ keV}. Ecuación (3) de Park, 2017
+
 3.Secciones eficaces de interacción Compton usuales.
 ![KN_gammas_no_polarizados[1].pdf](KN_gammas_no_polarizados[1].pdf)
 ![Thomson_scattering_cross_section[1].pdf](Thomson_scattering_cross_section[1].pdf)
+
 4.Longitud de decaimiento de fotones masivos oscuros. Ecuación (5) de Park, 2017
 
 
