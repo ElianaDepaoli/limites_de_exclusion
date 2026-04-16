@@ -15,11 +15,13 @@ El archivo **DP_aux.C** contiene los siguientes cálculos auxiliares:
 
 4.Longitud de decaimiento de fotones masivos oscuros. Ecuación (5) de Park, 2017
 
-5. Secciones eficaces totales de producción de fotones masivos. Ecuaciones (A1, A2, A3) de Gondolo, 2009
+5.Secciones eficaces totales de producción de fotones masivos. Ecuaciones (A1, A2, A3) de Gondolo, 2009
 
 ![Compton_cross_section_for_production_of_massive_vector_boson.png](Compton_cross_section_for_production_of_massive_vector_boson.png)
 
+El comportamiento de la curva azul (bosones pseudoescalares) es como el de la curvas Compton habituales. Pero la que debería comportarse así es la celeste (bosones vectoriales) 
 
+![Compton_usual.png](Compton_usual.png)
 
 
 **Lo que sigue está mal**
