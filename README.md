@@ -15,6 +15,8 @@ El archivo **DP_aux.C** contiene los siguientes cálculos auxiliares:
 
 4.Longitud de decaimiento de fotones masivos oscuros. Ecuación (5) de Park, 2017
 
+5. Secciones eficaces totales de producción de fotones masivos. Ecuaciones (A1, A2, A3) de Gondolo, 2009
+![Compton_cross_section_for_production_of_massive_vector_boson.png][Compton_cross_section_for_production_of_massive_vector_boson.png]
 
 Lo que sigue está mal:
 ![Compton_foton_masivo[1].pdf](Compton_foton_masivo[1].pdf)
