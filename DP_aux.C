@@ -1,5 +1,5 @@
 /*Código desarrollado para graficar secciones eficaces y funciones usadas en el cálculo de límites de exclusión.
-Última actualización: 06/04/2026
+Última actualización: 16/04/2026
 Autora: E.Depaoli
 Basado en "Detecting Dark Photons with Reactor Neutrino Experiments" H.K.Park DOI: 10.1103/PhysRevLett.119.081801
 */
@@ -18,12 +18,12 @@ using std::endl;
 void archivo_a_vectores(vector<double>& x_v, vector<double>& y_v, vector<double>& z_v, const string filetitle);
 vector<double> gamma_ray_flux_FRJ1(vector<double> E_g_v, const double P);
 vector<double> differential_cross_section_Thomson(vector<double> E_g_v, double Egprima);
-vector<double> differential_cross_section_Thomson(vector<double> E_g_v, double EA, double mAc2);//DP
 vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double Egprima);
-vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double EA, double mAc2);//DP
-vector<double> differential_cs_gamma_A(vector<double> dSigma_dEA_v, double epsilon);//equation (2)
 vector<double> decay_length_LA(vector<double> EA_v, double mA_v, double epsilon);//(5)[mA]=[EA]=MeV
 vector<double> tensor_to_vector(vector<vector<vector<double>>> LA_tensor, int ii, int jj);
+vector<double> total_sigma_VB(vector<double> s_v, double mchic2, double g2chiee);
+vector<double> total_sigma_SB(vector<double> s_v, double mchic2, double g2chiee);
+vector<double> total_sigma_PSB(vector<double> s_v, double mchic2, double g2chiee);
 //........................................................................................
 
 //Configuracion global para los gráficos --------------------------
@@ -43,29 +43,32 @@ void SetGlobalStyle(){
 	st1->cd ();//This is now the current style gStyle
 }
 
-
 //........................................................................................
 //Contenedores···
 const string filetitle{"/home/eliana/Documentos/Scripts/limites_de_exclusion/Uranium-Coef_atenuacion_nist_gov_XrayMassCoef.txt"};
 vector<double> E_cross_section_v,  muroh_v, murohen_v;
 vector<double> total_cross_section_v;
 vector<double> E_gamma_cut_v, muroh_cut_v, murohen_cut_v;//incident gamma energy, mass atenuation coefficents. From table.
-vector<double> dSgA_dE_v;
 vector<double> EA_v;
 vector<double> LA_v;//auxiliar. Para llenar la matriz.
 vector<vector<vector<double>>> LA_tensor;
+vector<double> s_v;
+vector<double> snat_v;
+vector<double> Eg_v;
 //Constantes···
-float rho_U{1.895e1};//[g/cm3]
-float NA{6.02214076e23};
-float Mr_U{238.05079};//[g/mol]
-float mec2{0.51099895000};//masa e- [MeV] 2018 CODATA value
-float ro{2.8179403205e-15};//radio clásico de e- e2/4πepsilon_0mec2  [m2]
-float pi_ro2mec2{0};
+double rho_U{1.895e1};//[g/cm3]
+double NA{6.02214076e23};
+double Mr_U{238.05079};//[g/mol]
+double mec2{0.51099895000};//masa e- [MeV/c2] 2018 CODATA value
+double ro{2.8179403205e-15};//radio clásico de e- e2/4πepsilon_0mec2  [m2]
+double pi_ro2mec2{0};
+double alpha{1/137.035999177};//constante de estructura fina
+double ce{299792458.0};//velocidad de la luz [m/s]
 //........................................................................................
 
 void DP_aux()
 {
-	SetGlobalStyle();
+//	SetGlobalStyle();
 	//Coeficientes de atenuación másicos en función de la energía del gamma incidente ····
 	archivo_a_vectores(E_cross_section_v,muroh_v,murohen_v,filetitle);
 	
@@ -87,19 +90,51 @@ void DP_aux()
 	//Sección eficaz total en función de la energía del gamma incidente ···· 
 	for (int i{0}; i < muroh_cut_v.size();i++) total_cross_section_v.push_back(Mr_U*muroh_cut_v.at(i)/NA/1e-24); 
 
-	//Lleno EA_v vector de energías de los DP producidos ····
-	int n{5};//cantidad de puntos en el vector
-	float EA1{0.1};float EA2{4.0};//límites de integración en (7) y en la figura 1
-	for(int i{0}; i < n; ++i) EA_v.push_back(i*(EA2-EA1)/n+EA1);
-	//for (auto k:EA_v) cout << k << endl;//mostrar en pantalla
-	cout << "#elementos en EA_v = " << EA_v.size() << endl;
+	//······························································
+	//Sección eficaz total de producción de fotones masivos [m] ····
+	//······························································
+	
+	//Variable de Mandelstam y energía fotones incidentes ···
+	int nn{10000};//cantidad de puntos en el vector de energías incidentes
+	float Eg1{0.01};float Eg2{100.0};//desde hasta en MeV
+	float Eg_aux{0};
+	for(int i{0}; i < nn; ++i){
+		Eg_aux=i*(Eg2-Eg1)/nn+Eg1;
+		Eg_v.push_back(Eg_aux);
+		s_v.push_back((2*Eg_aux*mec2+pow(mec2,2))*pow(ce,-2));
+		snat_v.push_back(2*Eg_aux*mec2+pow(mec2,2));
+	} 
+/*
+	cout << "----- s [MeV^2/c^2] ------" << endl;
+	for(auto k:snat_v) cout << k << endl;
+	cout << "----- E_gamma [MeV] ------" << endl;
+	for(auto k:Eg_v) cout << k << endl;
+*/
+
 	//Parámetros ····
 	vector<double> epsilon_v{0.01,1.0};
 	vector<double> mA_v{0.1, 0.5, 1.0};
+	vector<double> mchic2_v{0.0};
+	vector<double> g2chiee_v{4*TMath::Pi()*alpha};
 
+	//vector<double> total_sigma_VB_v=total_sigma_VB(snat_v, 0, 4*TMath::Pi()*alpha);
+	vector<double> total_sigma_VB_v=total_sigma_VB(snat_v, 0, g2chiee_v.at(0));
+	vector<double> total_sigma_SB_v=total_sigma_SB(snat_v, 0, g2chiee_v.at(0));
+	vector<double> total_sigma_PSB_v=total_sigma_PSB(snat_v, 0, g2chiee_v.at(0));
+
+	cout << g2chiee_v.at(0) << endl;
+	/*cout << "----- Sigma_C [¿?] ------" << endl;
+	for(auto k:total_sigma_VB_v) cout << k << endl;
+*/
 	//····························································
 	//Longitud de decaimiento de A' a 3 fotones visibles [m]  ····
 	//····························································
+	//Energías de los DP producidos para calcular longitud decaimiento ····
+	int n{5};//cantidad de puntos en el vector
+	float EA1{0.1};float EA2{4.0};//límites de integración en (7) y en la figura 1
+	for(int i{0}; i < n; ++i) EA_v.push_back(i*(EA2-EA1)/n+EA1);
+	//for (auto k:EA_v) cout << k << endl;//mostraren pantalla
+	//cout << "#elementos en EA_v = " << EA_v.size() << endl;
 	//En función de la energía y de la masa del A' incidente ···· 
 	//Defino la dimensión del tensor vacío antes de llenarlo para poder iterar LA_tensor[i][k][j] = LA_v[k];
 	//Queda LA[mA][EA][epsilon]
@@ -107,38 +142,27 @@ void DP_aux()
 
 	//Lleno tensor 
 	for(int i{0}; i < mA_v.size(); ++i){
-		cout << "mA_v.at(i)" << mA_v.at(i) << " ---------- " << endl;
+	//	cout << "mA_v.at(i)" << mA_v.at(i) << " ---------- " << endl;
 		for(int j{0}; j < epsilon_v.size(); ++j){
-			cout << "epsilon_v.at(j)" << epsilon_v.at(j) << " ---------- " << endl;
+	//		cout << "epsilon_v.at(j)" << epsilon_v.at(j) << " ---------- " << endl;
 			//Calculo LA para mA(i), epsilon(j)
 			LA_v=decay_length_LA(EA_v, mA_v.at(i),epsilon_v.at(j));
 	//		cout << "LA_v.size() = " << LA_v.size() << endl;
 			//Guardo LA en la fila i, capa j
 			for(int k{0}; k < LA_v.size();++k){
 				LA_tensor[i][k][j] = LA_v[k];//
-				cout << LA_v[k] << endl;
+			//	cout << LA_v[k] << endl;
 			}
 
-			cout << "------" << endl;
+			//cout << "------" << endl;
 			//LA_v.clear();//No es necesario porque lo piso cada vez
 		}
 	}
 
-	cout << "---------------------------------------------------" << endl;
-	for(int k{0}; k < EA_v.size(); ++k) cout << LA_tensor[1][k][0] << endl;
-	cout << "LA_tensor size: " << std::size(LA_tensor) << endl; 
-	cout << "---------------------------------------------------" << endl;
-
-	//····························································
-	//Probando Sección eficaz de producción de DP vía Compton ····
-	//····························································
-	//En función de la energía del gamma incidente ···· 
-	vector<double> dSigma_dEA_T_v=differential_cross_section_Thomson(E_gamma_cut_v,2, 0.1);
-	vector<double> dSigma_dEA_KN_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v,2, 0.1);
-	vector<double> dSigma_dEA_T_2_v=differential_cross_section_Thomson(E_gamma_cut_v,2, 0.5);
-	vector<double> dSigma_dEA_KN_2_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v,2, 0.5);
-	vector<double> dSigma_dEA_T_3_v=differential_cross_section_Thomson(E_gamma_cut_v,2, 1.0);
-	vector<double> dSigma_dEA_KN_3_v=differential_cross_section_Klein_Nishina(E_gamma_cut_v,2, 1.0);
+	//cout << "---------------------------------------------------" << endl;
+	//for(int k{0}; k < EA_v.size(); ++k) cout << LA_tensor[1][k][0] << endl;
+	//cout << "LA_tensor size: " << std::size(LA_tensor) << endl; 
+	//cout << "---------------------------------------------------" << endl;
 
 	//··········································
 	//Probando sección eficaz Compton usual ····
@@ -166,33 +190,54 @@ void DP_aux()
 		//cout << "dE_g = " << E_gamma_cut_v.at(i+1) -E_gamma_cut_v.at(i) << " -- Integral acumulada = " << integral_above_1MeV << endl;//
 	}
 
-	//····························································
-	//Producción de DP vía Compton 							  ····
-	//····························································
-	vector<double> dSgamma_A_v=differential_cs_gamma_A(dSigma_dEA_T_v, 1);///(E_gamma_cut_v,2, 0.1);//differential cross section for sigma gamma -> A'
-
-	/*
-	cout << "Longitud(energías) = " << E_gamma_cut_v.size() << endl;
-	cout << "Longitud(flujo gamma) = " << dNg_dEg_v.size() << endl;
-	cout << "Longitud(sección eficaz total) = " << total_cross_section_v.size() << endl;
-	cout << "Longitud(sección eficaz diferencial gamma -> A') = " << dSgamma_A_v.size() << endl;
-*/
-
-	//Calculo un punto en la figura 1. dNA'/dEA'
-/*	double dNA_dEA{0};
-
-	for(int i{0}; i < dSgamma_A_v.size()-1; ++i){
-		dNA_dEA+= pow(total_cross_section_v.at(i),-1)*dSgamma_A_v.at(i)*dNg_dEg_v.at(i)*(E_gamma_cut_v.at(i+1)-E_gamma_cut_v.at(i));
-	}
-*/
-	//for (auto k:dSgamma_A_v) cout << k << endl;//mostrar en pantalla
-	
 	//Gráficos ····
+	//------------------------------------------------------------
+	//Secciones eficaces de producción de bosones masivos
+	//------------------------------------------------------------
+	TCanvas*c6 = new TCanvas("Compton cross section for production of massive vector boson","Compton cross section for production of massive vector boson", 100, 10, 1200, 500);
+	TGraph*TCCS_gr = new TGraph(Eg_v.size(), &Eg_v[0], &total_sigma_VB_v[0]);
+	TGraph*TCCS_SB_gr = new TGraph(Eg_v.size(), &Eg_v[0], &total_sigma_SB_v[0]);
+	TGraph*TCCS_PSB_gr = new TGraph(Eg_v.size(), &Eg_v[0], &total_sigma_PSB_v[0]);
+	
+	c6->SetGrid();
+	gPad->SetLogy();
+	gPad->SetLogx();
+	TCCS_gr->Draw("ALP");
+	TCCS_SB_gr->Draw("LP same");
+	TCCS_PSB_gr->Draw("LP same");
+	TCCS_gr->SetMarkerStyle(20);
+	TCCS_gr->SetMarkerColor(kCyan+1);
+	TCCS_gr->SetLineColor(kCyan+1);
+	TCCS_SB_gr->SetMarkerStyle(21);
+	TCCS_SB_gr->SetMarkerColor(kOrange+7);
+	TCCS_SB_gr->SetLineColor(kOrange+7);
+	TCCS_PSB_gr->SetMarkerStyle(22);
+	TCCS_PSB_gr->SetMarkerColor(kBlue+1);
+	TCCS_PSB_gr->SetLineColor(kBlue+1);
+	
+	TCCS_gr->SetTitle("Total cross section m_{#chi} = 0.0 MeV & g_{#chi e e} = 4#pi #alpha");
+	TCCS_gr->GetYaxis()->SetTitle("#sigma[MeV^{-2}]");
+	TCCS_gr->GetYaxis()->SetTitleSize(0.05);
+	TCCS_gr->GetYaxis()->SetRangeUser(1e-7, 1e-2);
+	TCCS_gr->GetXaxis()->SetTitle("E_{#gamma} [MeV]");
+	TCCS_gr->GetXaxis()->SetTitleSize(0.04);
+	TCCS_gr->GetXaxis()->SetTitleOffset(1.2);
+
+	auto leg6 = new TLegend(0.70,0.75,0.85,0.85); 
+    leg6->AddEntry(TCCS_gr,"Vector boson ","p");
+    leg6->AddEntry(TCCS_SB_gr,"Scalar boson ","p");
+    leg6->AddEntry(TCCS_PSB_gr,"Pseudoscalar boson ","p");
+    leg6->SetTextSize(0.03); 
+    leg6->SetBorderSize(0);
+    leg6->Draw();
+
+    c6->Print("Compton_cross_section_for_production_of_massive_vector_boson.png");
+
 	//····························································
 	//Longitud de decaimiento de A' a 3 fotones visibles [m]  ····
 	//····························································
 	//Vectores auxiliares para graficar mi "tensor"
-	vector<double> La_v1=tensor_to_vector(LA_tensor, 0, 1);
+/*	vector<double> La_v1=tensor_to_vector(LA_tensor, 0, 1);
 	vector<double> La_v2=tensor_to_vector(LA_tensor, 1, 1);
 	vector<double> La_v3=tensor_to_vector(LA_tensor, 2, 1);
 	vector<double> La_v11=tensor_to_vector(LA_tensor, 0, 0);
@@ -250,67 +295,9 @@ void DP_aux()
     leg5->Draw();
 
     //c5->Print("DP_decay_length.png");
-	//------------------------------------------------------------
 
 	//------------------------------------------------------------
-	//Secciones eficaces de producción
-	//------------------------------------------------------------
-/*	TCanvas*c4 = new TCanvas("DP production differential cross section","DP production differential cross section", 900, 500);
-	TGraph*TDP_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_T_v[0]);
-	TGraph*KNDP_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_KN_v[0]);
-
-	TGraph*TDP2_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_T_2_v[0]);
-	TGraph*KNDP2_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_KN_2_v[0]);
-	
-	TGraph*TDP3_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_T_3_v[0]);
-	TGraph*KNDP3_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEA_KN_3_v[0]);
-	
-	c4->SetGrid();
-	gPad->SetLogy();
-	gPad->SetLogx();
-	//TDP_gr->Draw("AP");
-	//KNDP_gr->Draw("sameP");//
-	TDP_gr->SetMarkerStyle(20);
-	KNDP_gr->SetMarkerStyle(20);
-
-	TDP2_gr->Draw("sameP");//
-	KNDP2_gr->Draw("sameP");//
-	TDP3_gr->Draw("sameP");//
-	KNDP3_gr->Draw("sameP");//
-
-	TDP2_gr->SetMarkerStyle(22);
-	KNDP2_gr->SetMarkerStyle(22);
-	TDP3_gr->SetMarkerStyle(21);
-	KNDP3_gr->SetMarkerStyle(21);
-	
-	TDP_gr->SetMarkerColor(kCyan);
-	KNDP_gr->SetMarkerColor(kOrange);
-
-	TDP2_gr->SetMarkerColor(kCyan+1);
-	KNDP2_gr->SetMarkerColor(kOrange+7);
-	TDP3_gr->SetMarkerColor(kBlue-4);
-	KNDP3_gr->SetMarkerColor(kOrange+10);
-	
-	TDP_gr->SetTitle("Differential cross section E_{A'} = 2.0 MeV ");
-	TDP_gr->GetYaxis()->SetTitle("#frac{d#sigma_{C}}{dE_{A'}}(E'_{A'})[m^{2}MeV^{-1}s^{-1}]");
-	TDP_gr->GetYaxis()->SetRangeUser(1e-32, 1e-28);
-	TDP_gr->GetXaxis()->SetTitle("E [MeV]");
-
-	auto leg4 = new TLegend(0.70,0.67,0.90,0.97); 
-    leg4->AddEntry(TDP_gr,("Thomson m'_{A'} = "+std::to_string(0.1).substr(0,3)+" MeV").c_str(),"p");
-    leg4->AddEntry(KNDP_gr,("Klein-Nishina m'_{A'} = "+std::to_string(0.1).substr(0,3)+" MeV").c_str(),"p");
-    leg4->AddEntry(TDP2_gr,("Thomson m'_{A'} = "+std::to_string(0.5).substr(0,3)+" MeV").c_str(),"p");
-    leg4->AddEntry(KNDP2_gr,("Klein-Nishina m'_{A'} = "+std::to_string(0.5).substr(0,3)+" MeV").c_str(),"p");
-    leg4->AddEntry(TDP3_gr,("Thomson m'_{A'} = "+std::to_string(1.0).substr(0,3)+" MeV").c_str(),"p");
-    leg4->AddEntry(KNDP3_gr,("Klein-Nishina m'_{A'} = "+std::to_string(1.0).substr(0,3)+" MeV").c_str(),"p");
-
-    leg4->SetTextSize(0.03); 
-    leg4->SetBorderSize(0);
-    leg4->Draw();
-
-    //c4->Print("DP_production_differential_cross_section.png");
-	//------------------------------------------------------------
-	//Secciones eficaces de producción
+	//Secciones eficaces de interacción Compton usuales
 	//------------------------------------------------------------
 	TCanvas*c3 = new TCanvas("Usual Compton differential cross section","Usual Compton differential cross section", 900, 500);
 	TGraph*Thomson_gr = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &dSigma_dEgprima_T_v[0]);
@@ -391,7 +378,7 @@ void DP_aux()
 	TGraph*mac = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &muroh_cut_v[0]);//&E_gamma_cut_v[0]);//
 	TGraph*csU = new TGraph(E_gamma_cut_v.size(), &E_gamma_cut_v[0], &total_cross_section_v[0]);
 	c1->SetGrid();
-	gPad->SetLogy();
+//	gPad->SetLogy();
 	gPad->SetLogx();
 	//mac->GetXaxis()->SetTitle("E [MeV]");
 	csU->GetXaxis()->SetTitle("E [MeV]");
@@ -464,52 +451,126 @@ vector<double> gamma_ray_flux_FRJ1(vector<double> E_g_v, const double P){
 	return dNg_dEg_v;	
 }
 
-//differential cross section for sigma gamma -> A' in the limit mA' << me
-vector<double> differential_cs_gamma_A(vector<double> dSigma_dEA_v, double epsilon){
-	vector<double> dSgA_dEA_v;
-	for(auto k:dSigma_dEA_v) dSgA_dEA_v.push_back(pow(epsilon,2)*k);
-	return dSgA_dEA_v;
-}
-
 //Interacción tipo Compton: gamma + e- -> A + e-
-//Sección eficaz diferencial en función de la energía del gamma incidente para un valor fijo de energía y masa del DP dispersado
-//Use [Energy]=MeV
-//Thomson····
-vector<double> differential_cross_section_Thomson(vector<double> E_g_v, double EA, double mAc2){
-	vector<double> dSigma_dEA_v;
-	double num{0};
-	double denom{0};
-	double cos_2_theta{0};
-	
-	for(auto k: E_g_v){
-		num=pow(k*mec2+pow(mAc2,2)/2-(k+mec2)*EA,2);
-		denom=pow(k,2)*(pow(EA,2)-pow(mAc2,2));
-		cos_2_theta=num/denom;
-		dSigma_dEA_v.push_back((cos_2_theta+1)*pow(EA,-2)*pi_ro2mec2);
-		//cout << "cos_2_theta = "<< cos_2_theta << endl;//"num = " << num << "denom = " << denom <<
-		//cout << (cos_2_theta+1)*pow(EA,-2)*pi_ro2mec2 << endl;
+//Total Compton cross section for production of bosons ·······································
+//Vector bosons ···
+vector<double> total_sigma_VB(vector<double> s_v, double mchic2, double g2chiee){//((p1+p2)^2, masa del DP al cuadrado, acoplamiento)
+	vector<double> sigma_v;
+	double AS{0};
+	double BS{0};
+	double logS{0};
+	double ce2=pow(ce,2);
+	double po{0};
+	double pe{0};
+	double ko{0};
+	double ke{0};
+	double bracket{0};
+	double mesquare{pow(mec2,2)};
+	double mchisquare{pow(mchic2,2)};
+
+	for(auto s: s_v){
+		
+		//Las variables ····
+		po=(s-mesquare+mchisquare)*pow(4*s,-0.5);
+		
+		ko=(s+mesquare)*pow(4*s,-0.5);
+		
+		pe=pow(pow(po,2)-mchisquare,0.5);
+		
+		ke=pow(s,0.5)-ko;
+		//··················
+
+		AS=2+2*(mesquare-mchisquare)*pow(s,-1)+16*(2*mesquare+mchisquare)*s*pow(s-mesquare,-2);
+		BS=2-4*(2*mesquare+mchisquare)*pow(s-mesquare,-1)-4*(4*pow(mesquare,2)-pow(mchisquare,2))*pow(s-mesquare,-2);
+		logS=TMath::Log((2*po*ko+2*pe*ke-mchic2)*pow(2*po*ko-2*pe*ke-mchic2,-1));
+		bracket=AS+BS*pow(s,0.5)*pow(pe,-1)*logS;
+
+		sigma_v.push_back(alpha*g2chiee*pe*pow(8*s*ke,-1)*bracket);
 	}
 
-	return dSigma_dEA_v;
-}
-//Klein Nishina····
-vector<double> differential_cross_section_Klein_Nishina(vector<double> E_g_v, double EA, double mAc2){
-	vector<double> dSigma_dEA_v;
-	double num{0};
-	double denom{0};
-	double cos_2_theta{0};
+	return sigma_v;
+}  
 
-	for(auto k: E_g_v){
-		num=pow(k*mec2+pow(mAc2,2)/2-(k+mec2)*EA,2);
-		denom=pow(k,2)*(pow(EA,2)-pow(mAc2,2));
-		cos_2_theta=num/denom;
-		dSigma_dEA_v.push_back((cos_2_theta + k*pow(EA,-1) + EA*pow(k,-1) - 1)*pow(k,-3)*EA*pi_ro2mec2);
-		//cout << "cos_2_theta = "<< cos_2_theta << endl;
+//Scalar bosons ···
+vector<double> total_sigma_SB(vector<double> s_v, double mchic2, double g2chiee){//((p1+p2)^2, masa del DP al cuadrado, acoplamiento)
+	vector<double> sigma_v;
+	double AS{0};
+	double BS{0};
+	double logS{0};
+	double ce2=pow(ce,2);
+	double po{0};
+	double pe{0};
+	double ko{0};
+	double ke{0};
+	double bracket{0};
+	double mesquare{pow(mec2,2)};
+	double mchisquare{pow(mchic2,2)};
+
+	for(auto s: s_v){
+		
+		//Las variables ····
+		po=(s-mesquare+mchisquare)*pow(4*s,-0.5);
+		
+		ko=(s+mesquare)*pow(4*s,-0.5);
+		
+		pe=pow(pow(po,2)-mchisquare,0.5);
+		
+		ke=pow(s,0.5)-ko;
+		//··················
+		AS=-3+(mesquare-mchisquare)*pow(s,-1)+8*(-4*mesquare+mchisquare)*s*pow(s-mesquare,-2);
+
+		BS=1+2*(mchisquare-4*mesquare)*pow(s-mesquare,-1)+2*(pow(mesquare,2)-6*mchisquare*mesquare+8*pow(mchisquare,2))*pow(s-mesquare,-2);
+
+		logS=TMath::Log((2*po*ko+2*pe*ke-mchic2)*pow(2*po*ko-2*pe*ke-mchic2,-1));
+		bracket=AS+BS*pow(s,0.5)*pow(pe,-1)*logS;
+
+		sigma_v.push_back(alpha*g2chiee*pe*pow(8*s*ke,-1)*bracket);
 	}
 
-	return dSigma_dEA_v;
-}
+	return sigma_v;
+}  
 
+//pseudoscalar bosons ···
+vector<double> total_sigma_PSB(vector<double> s_v, double mchic2, double g2chiee){//((p1+p2)^2, masa del DP al cuadrado, acoplamiento)
+	vector<double> sigma_v;
+	double AS{0};
+	double BS{0};
+	double logS{0};
+	double ce2=pow(ce,2);
+	double po{0};
+	double pe{0};
+	double ko{0};
+	double ke{0};
+	double bracket{0};
+	double mesquare{pow(mec2,2)};
+	double mchisquare{pow(mchic2,2)};
+
+	for(auto s: s_v){
+		
+		//Las variables ····
+		po=(s-mesquare+mchisquare)*pow(4*s,-0.5);
+		
+		ko=(s+mesquare)*pow(4*s,-0.5);
+		
+		pe=pow(pow(po,2)-mchisquare,0.5);
+		
+		ke=pow(s,0.5)-ko;
+		//··················
+		AS=-3+(mesquare-mchisquare)*pow(s,-1)+8*(mchisquare)*s*pow(s-mesquare,-2);
+
+		BS=1-2*(mchisquare)*pow(s-mesquare,-1)+2*mchisquare*(mchisquare-2*mesquare)*pow(s-mesquare,-2);
+
+		logS=TMath::Log((2*po*ko+2*pe*ke-mchic2)*pow(2*po*ko-2*pe*ke-mchic2,-1));
+		bracket=AS+BS*pow(s,0.5)*pow(pe,-1)*logS;
+
+		sigma_v.push_back(alpha*g2chiee*pe*pow(8*s*ke,-1)*bracket);
+	}
+
+	return sigma_v;
+}  
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Compton clásico
 //Sección eficaz diferencial en función de la energía del gamma incidente para un valor fijo de energía del gamma dispersado
 //Use [Energy]=MeV
